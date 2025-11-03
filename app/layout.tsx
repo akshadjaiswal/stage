@@ -13,8 +13,55 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Image Showcase Builder",
-  description: "Create stunning showcase images for your projects with customizable templates and layouts",
+  title: {
+    default: "Stage - Image Showcase Builder",
+    template: "%s | Stage",
+  },
+  description: "Create stunning showcase images for your projects with customizable templates and layouts. A modern canvas editor for adding images, text, and backgrounds.",
+  keywords: ["image editor", "canvas editor", "design tool", "image showcase", "template builder"],
+  authors: [{ name: "Stage" }],
+  creator: "Stage",
+  publisher: "Stage",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "/",
+    siteName: "Stage",
+    title: "Stage - Image Showcase Builder",
+    description: "Create stunning showcase images for your projects with customizable templates and layouts",
+    images: [
+      {
+        url: "/og.png",
+        width: 1200,
+        height: 630,
+        alt: "Stage - Image Showcase Builder",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Stage - Image Showcase Builder",
+    description: "Create stunning showcase images for your projects with customizable templates and layouts",
+    images: ["/og.png"],
+    creator: "@stage",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+  icons: {
+    icon: "/logo.png",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({
