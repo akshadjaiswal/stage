@@ -12,11 +12,12 @@ import { ExportDialog } from '@/components/canvas/dialogs/ExportDialog';
 import { StyleTabs } from './style-tabs';
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
+import { getAspectRatioPreset } from '@/lib/aspect-ratio-utils';
 
 export function SidebarLeft({
   ...props
 }: React.ComponentProps<typeof Sidebar>) {
-  const { uploadedImageUrl } = useImageStore();
+  const { uploadedImageUrl, selectedAspectRatio } = useImageStore();
   const [exportDialogOpen, setExportDialogOpen] = React.useState(false);
 
   const handleExport = async (format: 'png' | 'jpg', quality: number, scale: number = 3): Promise<{ dataURL: string; blob: Blob }> => {
@@ -27,6 +28,17 @@ export function SidebarLeft({
     if (!element) {
       throw new Error('Image render card not found. Please ensure an image is uploaded.');
     }
+
+    // Get actual pixel dimensions from aspect ratio preset
+    const preset = getAspectRatioPreset(selectedAspectRatio);
+    if (!preset) {
+      throw new Error('Invalid aspect ratio selected');
+    }
+    
+    // Use actual pixel dimensions for export
+    // The scale parameter will multiply the resolution/quality
+    const exportWidth = preset.width;
+    const exportHeight = preset.height;
 
     // Wait for all images to load
     const images = element.getElementsByTagName('img');
@@ -177,14 +189,14 @@ export function SidebarLeft({
     try {
       const canvas = await html2canvas(element, {
         backgroundColor: null,
-        scale: scale, // Higher scale for better quality
+        scale: scale, // Scale multiplies the resolution/quality
         useCORS: true,
         allowTaint: true,
         logging: false,
-        width: element.scrollWidth || element.clientWidth,
-        height: element.scrollHeight || element.clientHeight,
-        windowWidth: element.scrollWidth || element.clientWidth,
-        windowHeight: element.scrollHeight || element.clientHeight,
+        width: exportWidth,
+        height: exportHeight,
+        windowWidth: exportWidth,
+        windowHeight: exportHeight,
         removeContainer: true,
         imageTimeout: 15000,
         onclone: (clonedDoc, clonedElement) => {
@@ -195,6 +207,25 @@ export function SidebarLeft({
           const targetElement = clonedDoc.getElementById('image-render-card') || clonedElement;
           
           if (targetElement) {
+            (targetElement as HTMLElement).style.width = `${exportWidth}px`;
+            (targetElement as HTMLElement).style.height = `${exportHeight}px`;
+            (targetElement as HTMLElement).style.maxWidth = 'none';
+            (targetElement as HTMLElement).style.maxHeight = 'none';
+            
+            // Also ensure parent containers don't constrain the size
+            let parent = targetElement.parentElement;
+            while (parent && parent !== clonedDoc.body) {
+              if (parent.style) {
+                parent.style.width = 'auto';
+                parent.style.height = 'auto';
+                parent.style.maxWidth = 'none';
+                parent.style.maxHeight = 'none';
+                parent.style.display = 'flex';
+                parent.style.alignItems = 'center';
+                parent.style.justifyContent = 'center';
+              }
+              parent = parent.parentElement;
+            }
             // Ensure all images are loaded in the cloned document
             const images = targetElement.getElementsByTagName('img');
             Array.from(images).forEach((img) => {

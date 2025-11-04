@@ -20,11 +20,11 @@ export const AspectRatioDropdown = () => {
         <Button
           aria-label="Select aspect ratio"
           variant="outline"
-          className="w-full"
+          className="w-full justify-start"
         >
           <span className="flex items-center gap-2">
             <span
-              className="bg-primary rounded border"
+              className="bg-primary rounded border shrink-0"
               style={{
                 width: '20px',
                 height: `${20 * (current?.ratio || 1)}px`,
@@ -32,14 +32,14 @@ export const AspectRatioDropdown = () => {
                 minHeight: '8px',
               }}
             />
-            <span className="text-sm font-medium">
-              {current?.name || 'Aspect Ratio'}
+            <span className="text-sm font-medium flex-1 text-left">
+              {current ? `${current.name} (${current.width}:${current.height})` : 'Aspect Ratio'}
             </span>
           </span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="p-4">
-        <AspectRatioPicker />
+      <PopoverContent className="p-4 w-[400px] max-h-[600px]" align="start">
+        <AspectRatioPicker onSelect={() => setOpen(false)} />
       </PopoverContent>
     </Popover>
   );

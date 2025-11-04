@@ -15,6 +15,7 @@ import { cloudinaryPublicIds } from '@/lib/cloudinary-backgrounds';
 import { useDropzone } from 'react-dropzone';
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE } from '@/lib/constants';
 import { ImageSquare as ImageIcon } from '@phosphor-icons/react';
+import { aspectRatios } from '@/lib/constants/aspect-ratios';
 
 export function StyleTabs() {
   const {
@@ -23,6 +24,7 @@ export function StyleTabs() {
     backgroundBorderRadius,
     imageOpacity,
     imageScale,
+    selectedAspectRatio,
     setBackgroundType,
     setBackgroundValue,
     setBackgroundOpacity,
@@ -106,6 +108,40 @@ export function StyleTabs() {
         <div className="space-y-3">
           <Label className="text-sm font-medium">Aspect Ratio</Label>
           <AspectRatioDropdown />
+          
+          {/* Selected Aspect Ratio Display */}
+          {selectedAspectRatio && (() => {
+            const selectedRatio = aspectRatios.find((ar) => ar.id === selectedAspectRatio);
+            if (!selectedRatio) return null;
+            
+            return (
+              <div className="mt-3">
+                <Label className="text-xs text-gray-600 mb-2 block">Selected</Label>
+                <div
+                  className="relative rounded-lg overflow-hidden border-2 border-blue-500 ring-2 ring-blue-500/20 bg-gradient-to-br from-gray-100 to-gray-200"
+                  style={{
+                    aspectRatio: `${selectedRatio.width} / ${selectedRatio.height}`,
+                    maxHeight: '120px',
+                  }}
+                >
+                  <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-600 text-white">
+                    {selectedRatio.width}:{selectedRatio.height}
+                  </div>
+                  
+                  <div className="absolute bottom-0 left-0 right-0 p-1.5 bg-gradient-to-t from-blue-600/90 to-transparent">
+                    <div className="text-[10px] font-semibold text-white">
+                      {selectedRatio.name}
+                    </div>
+                    {selectedRatio.useCase && (
+                      <div className="text-[9px] mt-0.5 text-blue-100">
+                        {selectedRatio.useCase}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </TabsContent>
 

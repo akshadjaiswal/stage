@@ -1,8 +1,8 @@
-import { aspectRatios } from '@/lib/constants/aspect-ratios';
 import { getBackgroundCSS } from '@/lib/constants/backgrounds';
 import { useImageStore } from '@/lib/store';
 import { ContentContainer } from './content-container';
 import { TextOverlayRenderer } from './text-overlay-renderer';
+import { useResponsiveCanvasDimensions } from '@/hooks/useAspectRatioDimensions';
 import React from 'react';
 
 interface BackgroundComponentProps {
@@ -10,42 +10,53 @@ interface BackgroundComponentProps {
   children?: React.ReactNode;
 }
 
+/**
+ * BackgroundComponent - Displays the canvas with proper aspect ratio and dimensions
+ * 
+ * This component:
+ * - Uses actual pixel dimensions from aspect ratio presets
+ * - Automatically scales to fit viewport while maintaining aspect ratio
+ * - Supports background gradients, solid colors, and images
+ * - Handles blur effects for background images
+ */
 export const BackgroundComponent = ({
   imageUrl,
   children,
 }: BackgroundComponentProps) => {
-  const { backgroundConfig, selectedAspectRatio, backgroundBorderRadius } = useImageStore();
+  const { backgroundConfig, backgroundBorderRadius } = useImageStore();
   const backgroundStyle = getBackgroundCSS(backgroundConfig);
-  const aspectRatio =
-    aspectRatios.find((ar) => ar.id === selectedAspectRatio)?.ratio || 1;
+  const { width, height, aspectRatio } = useResponsiveCanvasDimensions();
 
   // Extract blur from backgroundStyle if it exists
   const { filter, ...restBackgroundStyle } = backgroundStyle;
   const hasBlur = backgroundConfig.type === 'image' && (backgroundConfig.blur || 0) > 0;
 
-  // When blur is applied, we need to separate the background from the blur effect
-  // The blurred version should be on a separate layer
+  // Container style with actual dimensions
   const containerStyle = hasBlur
     ? {
         // Remove background image from main container when blur is active
         backgroundImage: 'none',
         backgroundColor: restBackgroundStyle.backgroundColor || 'transparent',
         opacity: restBackgroundStyle.opacity,
+        width: '100%',
+        maxWidth: `${width}px`,
         aspectRatio,
-        maxHeight: '80vh',
+        maxHeight: '90vh',
       }
     : {
         ...restBackgroundStyle,
+        width: '100%',
+        maxWidth: `${width}px`,
         aspectRatio,
-        maxHeight: '80vh',
+        maxHeight: '90vh',
       };
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="w-full max-w-7xl flex items-center justify-center">
+    <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="w-full flex items-center justify-center">
         <div
           id="image-render-card"
-          className="overflow-hidden shadow-2xl flex items-center justify-center p-8 relative"
+          className="overflow-hidden shadow-2xl flex items-center justify-center relative"
           style={{
             ...containerStyle,
             borderRadius: `${backgroundBorderRadius}px`,
@@ -67,7 +78,7 @@ export const BackgroundComponent = ({
               }}
             />
           )}
-          <div className="p-6 w-full h-full flex items-center justify-center relative z-10">
+          <div className="w-full h-full flex items-center justify-center relative z-10 p-6">
             <ContentContainer imageUrl={imageUrl}>{children}</ContentContainer>
             <TextOverlayRenderer />
           </div>
