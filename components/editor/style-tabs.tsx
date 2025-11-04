@@ -20,13 +20,17 @@ export function StyleTabs() {
   const {
     backgroundConfig,
     borderRadius,
+    backgroundBorderRadius,
     imageOpacity,
+    imageScale,
     setBackgroundType,
     setBackgroundValue,
     setBackgroundOpacity,
     setBackgroundBlur,
     setBorderRadius,
+    setBackgroundBorderRadius,
     setImageOpacity,
+    setImageScale,
   } = useImageStore();
 
   const [bgUploadError, setBgUploadError] = React.useState<string | null>(null);
@@ -307,6 +311,47 @@ export function StyleTabs() {
           )}
 
           <div className="space-y-3">
+            <Label className="text-sm font-medium">Border Radius</Label>
+            <div className="flex gap-2 mb-3">
+              <Button
+                variant={backgroundBorderRadius === 0 ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setBackgroundBorderRadius(0)}
+                className={`flex-1 text-xs transition-all ${
+                  backgroundBorderRadius === 0
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                    : 'border-blue-200 hover:border-blue-300 hover:bg-blue-50'
+                }`}
+              >
+                Sharp Edge
+              </Button>
+              <Button
+                variant={backgroundBorderRadius > 0 ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setBackgroundBorderRadius(24)}
+                className={`flex-1 text-xs transition-all ${
+                  backgroundBorderRadius > 0
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                    : 'border-blue-200 hover:border-blue-300 hover:bg-blue-50'
+                }`}
+              >
+                Rounded
+              </Button>
+            </div>
+            <div className="flex justify-between items-center">
+              <Label className="text-sm font-medium">Border Radius</Label>
+              <span className="text-sm text-muted-foreground">{backgroundBorderRadius}px</span>
+            </div>
+            <Slider
+              value={[backgroundBorderRadius]}
+              onValueChange={(value) => setBackgroundBorderRadius(value[0])}
+              min={0}
+              max={100}
+              step={1}
+            />
+          </div>
+
+          <div className="space-y-3">
             <div className="flex justify-between items-center">
               <Label className="text-sm font-medium">Opacity</Label>
               <span className="text-sm text-muted-foreground">
@@ -327,6 +372,33 @@ export function StyleTabs() {
       <TabsContent value="image" className="space-y-4 mt-4">
         <div className="space-y-4">
           <div className="space-y-3">
+            <Label className="text-sm font-medium">Border Radius</Label>
+            <div className="flex gap-2 mb-3">
+              <Button
+                variant={borderRadius === 0 ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setBorderRadius(0)}
+                className={`flex-1 text-xs transition-all ${
+                  borderRadius === 0
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                    : 'border-blue-200 hover:border-blue-300 hover:bg-blue-50'
+                }`}
+              >
+                Sharp Edge
+              </Button>
+              <Button
+                variant={borderRadius > 0 ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setBorderRadius(24)}
+                className={`flex-1 text-xs transition-all ${
+                  borderRadius > 0
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                    : 'border-blue-200 hover:border-blue-300 hover:bg-blue-50'
+                }`}
+              >
+                Rounded
+              </Button>
+            </div>
             <div className="flex justify-between items-center">
               <Label className="text-sm font-medium">Border Radius</Label>
               <span className="text-sm text-muted-foreground">{borderRadius}px</span>
@@ -338,6 +410,25 @@ export function StyleTabs() {
               max={100}
               step={1}
             />
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <Label className="text-sm font-medium">Image Size</Label>
+              <span className="text-sm text-muted-foreground">
+                {imageScale}%
+              </span>
+            </div>
+            <Slider
+              value={[imageScale]}
+              onValueChange={(value) => setImageScale(value[0])}
+              min={10}
+              max={200}
+              step={1}
+            />
+            <p className="text-xs text-muted-foreground">
+              Adjust the size of the image (10% - 200%)
+            </p>
           </div>
 
           <div className="space-y-3">

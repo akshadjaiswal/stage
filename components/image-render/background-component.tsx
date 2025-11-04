@@ -14,7 +14,7 @@ export const BackgroundComponent = ({
   imageUrl,
   children,
 }: BackgroundComponentProps) => {
-  const { backgroundConfig, selectedAspectRatio } = useImageStore();
+  const { backgroundConfig, selectedAspectRatio, backgroundBorderRadius } = useImageStore();
   const backgroundStyle = getBackgroundCSS(backgroundConfig);
   const aspectRatio =
     aspectRatios.find((ar) => ar.id === selectedAspectRatio)?.ratio || 1;
@@ -23,16 +23,32 @@ export const BackgroundComponent = ({
   const { filter, ...restBackgroundStyle } = backgroundStyle;
   const hasBlur = backgroundConfig.type === 'image' && (backgroundConfig.blur || 0) > 0;
 
+  // When blur is applied, we need to separate the background from the blur effect
+  // The blurred version should be on a separate layer
+  const containerStyle = hasBlur
+    ? {
+        // Remove background image from main container when blur is active
+        backgroundImage: 'none',
+        backgroundColor: restBackgroundStyle.backgroundColor || 'transparent',
+        opacity: restBackgroundStyle.opacity,
+        aspectRatio,
+        maxHeight: '80vh',
+      }
+    : {
+        ...restBackgroundStyle,
+        aspectRatio,
+        maxHeight: '80vh',
+      };
+
   return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="w-full max-w-7xl flex items-center justify-center">
         <div
           id="image-render-card"
-          className="rounded-2xl overflow-hidden shadow-2xl flex items-center justify-center p-8 relative"
+          className="overflow-hidden shadow-2xl flex items-center justify-center p-8 relative"
           style={{
-            ...restBackgroundStyle,
-            aspectRatio,
-            maxHeight: '80vh',
+            ...containerStyle,
+            borderRadius: `${backgroundBorderRadius}px`,
           }}
         >
           {/* Blur overlay for background images */}
@@ -41,10 +57,12 @@ export const BackgroundComponent = ({
               className="absolute inset-0"
               style={{
                 backgroundImage: restBackgroundStyle.backgroundImage,
-                backgroundSize: restBackgroundStyle.backgroundSize,
-                backgroundPosition: restBackgroundStyle.backgroundPosition,
-                backgroundRepeat: restBackgroundStyle.backgroundRepeat,
-                filter: filter,
+                backgroundSize: restBackgroundStyle.backgroundSize || 'cover',
+                backgroundPosition: restBackgroundStyle.backgroundPosition || 'center',
+                backgroundRepeat: restBackgroundStyle.backgroundRepeat || 'no-repeat',
+                filter: filter || `blur(${backgroundConfig.blur}px)`,
+                opacity: restBackgroundStyle.opacity !== undefined ? restBackgroundStyle.opacity : 1,
+                borderRadius: `${backgroundBorderRadius}px`,
                 zIndex: 0,
               }}
             />

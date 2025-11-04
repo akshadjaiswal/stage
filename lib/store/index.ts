@@ -33,14 +33,17 @@ interface ImageState {
   imageName: string | null;
   selectedGradient: GradientKey;
   borderRadius: number;
+  backgroundBorderRadius: number;
   selectedAspectRatio: AspectRatioKey;
   backgroundConfig: BackgroundConfig;
   textOverlays: TextOverlay[];
   imageOpacity: number;
+  imageScale: number;
   setImage: (file: File) => void;
   clearImage: () => void;
   setGradient: (gradient: GradientKey) => void;
   setBorderRadius: (radius: number) => void;
+  setBackgroundBorderRadius: (radius: number) => void;
   setAspectRatio: (aspectRatio: AspectRatioKey) => void;
   setBackgroundConfig: (config: BackgroundConfig) => void;
   setBackgroundType: (type: BackgroundType) => void;
@@ -52,6 +55,7 @@ interface ImageState {
   removeTextOverlay: (id: string) => void;
   clearTextOverlays: () => void;
   setImageOpacity: (opacity: number) => void;
+  setImageScale: (scale: number) => void;
   exportImage: () => Promise<void>;
 }
 
@@ -59,7 +63,8 @@ export const useImageStore = create<ImageState>((set, get) => ({
   uploadedImageUrl: null,
   imageName: null,
   selectedGradient: 'primary_gradient',
-  borderRadius: 24,
+  borderRadius: 0, // Sharp edge by default
+  backgroundBorderRadius: 0, // Sharp edge by default
   selectedAspectRatio: '16_9',
   backgroundConfig: {
     type: 'gradient',
@@ -69,6 +74,7 @@ export const useImageStore = create<ImageState>((set, get) => ({
   },
   textOverlays: [],
   imageOpacity: 1,
+  imageScale: 100, // Percentage scale, default 100%
 
   setImage: (file: File) => {
     const imageUrl = URL.createObjectURL(file);
@@ -95,6 +101,10 @@ export const useImageStore = create<ImageState>((set, get) => ({
 
   setBorderRadius: (radius: number) => {
     set({ borderRadius: radius });
+  },
+
+  setBackgroundBorderRadius: (radius: number) => {
+    set({ backgroundBorderRadius: radius });
   },
 
   setAspectRatio: (aspectRatio: AspectRatioKey) => {
@@ -172,6 +182,10 @@ export const useImageStore = create<ImageState>((set, get) => ({
 
   setImageOpacity: (opacity: number) => {
     set({ imageOpacity: opacity });
+  },
+
+  setImageScale: (scale: number) => {
+    set({ imageScale: scale });
   },
 
   exportImage: async () => {
