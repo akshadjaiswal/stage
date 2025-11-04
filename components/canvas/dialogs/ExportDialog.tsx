@@ -3,38 +3,43 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Slider } from "@/components/ui/slider";
+import { FormatSelector, ScaleSlider, QualitySlider } from "@/components/export";
 
 interface ExportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onExport: (format: "png" | "jpg", quality: number) => Promise<string>;
+  onExport: () => Promise<void>;
+  format: "png" | "jpg";
+  quality: number;
+  scale: number;
+  isExporting: boolean;
+  onFormatChange: (format: "png" | "jpg") => void;
+  onQualityChange: (quality: number) => void;
+  onScaleChange: (scale: number) => void;
 }
 
-export function ExportDialog({ open, onOpenChange, onExport }: ExportDialogProps) {
-  const [exportFormat, setExportFormat] = useState<"png" | "jpg">("png");
-  const [exportQuality, setExportQuality] = useState(0.92);
-  const [isExporting, setIsExporting] = useState(false);
+export function ExportDialog({ 
+  open, 
+  onOpenChange, 
+  onExport,
+  format,
+  quality,
+  scale,
+  isExporting,
+  onFormatChange,
+  onQualityChange,
+  onScaleChange,
+}: ExportDialogProps) {
+  const [error, setError] = useState<string | null>(null);
 
   const handleExport = async () => {
-    setIsExporting(true);
+    setError(null);
     try {
-      const dataURL = await onExport(exportFormat, exportQuality);
-
-      const link = document.createElement("a");
-      link.download = `stage-${Date.now()}.${exportFormat}`;
-      link.href = dataURL;
-      
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
+      await onExport();
       onOpenChange(false);
-    } catch (error) {
-      console.error("Export failed:", error);
-      alert("Failed to export image. Please try again.");
-    } finally {
-      setIsExporting(false);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to export image. Please try again.";
+      setError(errorMessage);
     }
   };
 
@@ -45,42 +50,17 @@ export function ExportDialog({ open, onOpenChange, onExport }: ExportDialogProps
           <DialogTitle className="text-lg sm:text-xl font-semibold text-gray-900">Export Canvas</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 sm:space-y-5">
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-gray-700">Format</label>
-            <div className="flex gap-2">
-              <Button
-                variant={exportFormat === "png" ? "default" : "outline"}
-                onClick={() => setExportFormat("png")}
-                className={`flex-1 h-11 touch-manipulation ${exportFormat === "png" ? "bg-blue-600 hover:bg-blue-700" : ""}`}
-              >
-                PNG
-              </Button>
-              <Button
-                variant={exportFormat === "jpg" ? "default" : "outline"}
-                onClick={() => setExportFormat("jpg")}
-                className={`flex-1 h-11 touch-manipulation ${exportFormat === "jpg" ? "bg-blue-600 hover:bg-blue-700" : ""}`}
-              >
-                JPG
-              </Button>
-            </div>
-          </div>
+          <FormatSelector format={format} onFormatChange={onFormatChange} />
+          
+          <ScaleSlider scale={scale} onScaleChange={onScaleChange} />
 
-          {exportFormat === "jpg" && (
-            <div className="space-y-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-semibold text-gray-700">Quality</label>
-                <span className="text-sm font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-                  {Math.round(exportQuality * 100)}%
-                </span>
-              </div>
-              <Slider
-                value={[exportQuality]}
-                onValueChange={([value]) => setExportQuality(value)}
-                min={0.1}
-                max={1}
-                step={0.01}
-                className="py-2"
-              />
+          {format === "jpg" && (
+            <QualitySlider quality={quality} onQualityChange={onQualityChange} />
+          )}
+
+          {error && (
+            <div className="text-sm text-red-600 bg-red-50 p-2 rounded border border-red-200">
+              {error}
             </div>
           )}
 
@@ -96,7 +76,7 @@ export function ExportDialog({ open, onOpenChange, onExport }: ExportDialogProps
             className="w-full h-11 font-semibold bg-blue-600 hover:bg-blue-700"
             size="lg"
           >
-            {isExporting ? "Exporting..." : `Export as ${exportFormat.toUpperCase()}`}
+            {isExporting ? "Exporting..." : `Export as ${format.toUpperCase()}`}
           </Button>
         </div>
       </DialogContent>

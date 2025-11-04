@@ -1,57 +1,63 @@
 "use client";
 
-import { useEffect } from "react";
-import { CanvasProvider, useCanvasContext } from "@/components/canvas/CanvasContext";
-import { CanvasEditor } from "@/components/canvas/CanvasEditor";
-import { CanvasToolbar } from "@/components/canvas/CanvasToolbar";
-import { Navigation } from "@/components/landing/Navigation";
+import * as React from "react";
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
+import { SidebarLeft } from "./sidebar-left";
+import { EditorHeader } from "./EditorHeader";
+import { EditorContent } from "./EditorContent";
+import { UploadArea } from "./UploadArea";
 import { Footer } from "@/components/landing/Footer";
+import { useImageStore } from "@/lib/store";
+import { ImageRenderCard } from "@/components/image-render/image-render-card";
 
-function EditorContent() {
-  const { loadDesign, stage, layer } = useCanvasContext();
+function EditorMain() {
+  const { uploadedImageUrl, setImage } = useImageStore();
+  const [uploadError, setUploadError] = React.useState<string | null>(null);
 
-  // Load design from sessionStorage if available
-  useEffect(() => {
-    if (!stage || !layer) return;
-
-    const loadDesignData = sessionStorage.getItem("loadDesign");
-    if (loadDesignData) {
-      try {
-        const design = JSON.parse(loadDesignData);
-        if (design.canvasData) {
-          loadDesign(design.canvasData).catch((error) => {
-            console.error("Failed to load design:", error);
-          });
-        }
-        // Clear the sessionStorage after loading
-        sessionStorage.removeItem("loadDesign");
-      } catch (error) {
-        console.error("Failed to parse design data:", error);
-        sessionStorage.removeItem("loadDesign");
-      }
+  const handleUpload = React.useCallback(async (imageUrl: string) => {
+    try {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const file = new File([blob], "uploaded-image.png", { type: blob.type });
+      setImage(file);
+      setUploadError(null);
+    } catch (error) {
+      console.error("Failed to process uploaded image:", error);
+      setUploadError("Failed to load image. Please try again.");
     }
-  }, [stage, layer, loadDesign]);
+  }, [setImage]);
+
+  const handleFileUpload = React.useCallback(
+    async (file: File) => {
+      setUploadError(null);
+      const blobUrl = URL.createObjectURL(file);
+      await handleUpload(blobUrl);
+    },
+    [handleUpload]
+  );
 
   return (
-    <div className="min-h-screen flex flex-col relative bg-gray-50">
-      <Navigation ctaLabel="Home" ctaHref="/" />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="shrink-0 pt-3 pb-2 md:pt-6 md:pb-4">
-          <CanvasToolbar />
+    <SidebarProvider>
+      <SidebarLeft />
+      <SidebarInset>
+        <div className="min-h-screen flex flex-col bg-background">
+          <EditorHeader />
+          <EditorContent>
+            {!uploadedImageUrl ? (
+              <UploadArea onUpload={handleFileUpload} error={uploadError} />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <ImageRenderCard imageUrl={uploadedImageUrl} />
+              </div>
+            )}
+          </EditorContent>
+          <Footer />
         </div>
-        <div className="flex-1 w-full flex items-center justify-center p-4 sm:p-6 md:p-8 lg:p-12 xl:p-20">
-          <CanvasEditor className="w-full h-full max-w-full max-h-full" />
-        </div>
-      </div>
-      <Footer />
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
 
 export function EditorLayout() {
-  return (
-    <CanvasProvider>
-      <EditorContent />
-    </CanvasProvider>
-  );
+  return <EditorMain />;
 }

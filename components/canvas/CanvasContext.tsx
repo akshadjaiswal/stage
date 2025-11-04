@@ -230,12 +230,24 @@ export function CanvasProvider({ children }: { children: React.ReactNode }) {
         const imgWidth = img.width || 1;
         const imgHeight = img.height || 1;
 
-        let scale = 1;
-        if (imgWidth > canvasWidth || imgHeight > canvasHeight) {
-          scale = Math.min(canvasWidth / imgWidth, canvasHeight / imgHeight) * 0.8;
-        } else {
-          scale = Math.min(canvasWidth / imgWidth, canvasHeight / imgHeight) * 0.5;
-        }
+        // Calculate scale to fit image within canvas while maintaining aspect ratio
+        // Use a padding factor to ensure the image fits comfortably (0.9 means 90% of canvas)
+        const paddingFactor = 0.9;
+        const availableWidth = canvasWidth * paddingFactor;
+        const availableHeight = canvasHeight * paddingFactor;
+        
+        // Calculate scale to fit image within available space
+        const scaleX = availableWidth / imgWidth;
+        const scaleY = availableHeight / imgHeight;
+        const scale = Math.min(scaleX, scaleY, 1); // Don't scale up beyond original size
+
+        // Calculate scaled dimensions
+        const scaledWidth = imgWidth * scale;
+        const scaledHeight = imgHeight * scale;
+
+        // Center the image on the canvas
+        const centerX = (canvasWidth - scaledWidth) / 2;
+        const centerY = (canvasHeight - scaledHeight) / 2;
 
       const imageId = `image-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       
@@ -255,10 +267,10 @@ export function CanvasProvider({ children }: { children: React.ReactNode }) {
       const newObject: CanvasObject = {
         id: imageId,
         type: "image",
-        x: options.x ?? (canvasWidth - imgWidth * scale) / 2,
-        y: options.y ?? (canvasHeight - imgHeight * scale) / 2,
-        width: imgWidth * scale,
-        height: imgHeight * scale,
+        x: options.x ?? centerX,
+        y: options.y ?? centerY,
+        width: scaledWidth,
+        height: scaledHeight,
         scaleX: 1,
         scaleY: 1,
         rotation: 0,
