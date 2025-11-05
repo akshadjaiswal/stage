@@ -1,6 +1,8 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
 import { TextOverlayControls } from '@/components/text-overlay/text-overlay-controls';
 import { StyleTabs } from './style-tabs';
 import { Button } from '@/components/ui/button';
@@ -33,7 +35,20 @@ export function EditorLeftPanel() {
       <div className="w-80 bg-gray-100 border-r border-gray-200 flex flex-col rounded-r-2xl overflow-hidden">
         {/* Header */}
         <div className="p-4 border-b border-gray-200 bg-white rounded-t-r-2xl">
-          <PresetSelector />
+          <div className="flex items-center gap-3">
+            <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
+              <Image 
+                src="/logo.png" 
+                alt="Stage" 
+                width={32} 
+                height={32}
+                className="h-8 w-8"
+              />
+            </Link>
+            <div className="flex-1">
+              <PresetSelector />
+            </div>
+          </div>
         </div>
 
         {/* Content */}
