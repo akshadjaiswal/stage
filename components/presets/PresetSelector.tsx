@@ -9,7 +9,6 @@ import {
 } from '@/components/ui/popover';
 import { useImageStore } from '@/lib/store';
 import { presets, type PresetConfig } from '@/lib/constants/presets';
-import { Sparkles } from 'lucide-react';
 import { getBackgroundStyle, getBackgroundCSS } from '@/lib/constants/backgrounds';
 import { cn } from '@/lib/utils';
 
@@ -70,7 +69,6 @@ export function PresetSelector() {
           size="sm"
           className="w-full h-10 justify-center gap-2.5 rounded-lg bg-background hover:bg-accent text-foreground border border-border hover:border-border/80 shadow-sm hover:shadow-md transition-all duration-200 font-semibold text-sm px-4 overflow-hidden"
         >
-          <Sparkles className="size-4 shrink-0" />
           <span className="truncate">Presets</span>
         </Button>
       </PopoverTrigger>

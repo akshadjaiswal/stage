@@ -9,8 +9,30 @@ import { useResponsiveCanvasDimensions } from '@/hooks/useAspectRatioDimensions'
 import { getBackgroundCSS } from '@/lib/constants/backgrounds'
 import { TextOverlayRenderer } from '@/components/image-render/text-overlay-renderer'
 
+// Global ref to store the Konva stage for export
+let globalKonvaStage: any = null;
+
 function CanvasRenderer({ image }: { image: HTMLImageElement }) {
   const stageRef = useRef<any>(null)
+  
+  // Store stage globally for export
+  useEffect(() => {
+    const updateStage = () => {
+      if (stageRef.current) {
+        // react-konva Stage ref gives us the Stage instance directly
+        globalKonvaStage = stageRef.current;
+      }
+    };
+    
+    updateStage();
+    // Also check after a short delay to ensure ref is set
+    const timeout = setTimeout(updateStage, 100);
+    
+    return () => {
+      clearTimeout(timeout);
+      globalKonvaStage = null;
+    };
+  });
   const patternRectRef = useRef<any>(null)
   const noiseRectRef = useRef<any>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -36,6 +58,10 @@ function CanvasRenderer({ image }: { image: HTMLImageElement }) {
   
   // Load background image if type is 'image'
   const [bgImage, setBgImage] = useState<HTMLImageElement | null>(null)
+  
+  // Get container dimensions early for use in useEffect
+  const containerWidth = responsiveDimensions.width
+  const containerHeight = responsiveDimensions.height
   
   useEffect(() => {
     if (backgroundConfig.type === 'image' && backgroundConfig.value) {
@@ -70,12 +96,15 @@ function CanvasRenderer({ image }: { image: HTMLImageElement }) {
         const { getCldImageUrl } = require('@/lib/cloudinary')
         const { cloudinaryPublicIds } = require('@/lib/cloudinary-backgrounds')
         if (cloudinaryPublicIds.includes(imageUrl)) {
+          // Use container dimensions for better quality
           imageUrl = getCldImageUrl({
             src: imageUrl,
-            width: 1920,
-            height: 1080,
+            width: Math.max(containerWidth, 1920),
+            height: Math.max(containerHeight, 1080),
             quality: 'auto',
             format: 'auto',
+            crop: 'fill',
+            gravity: 'auto',
           })
         } else {
           // Invalid image value, don't try to load
@@ -88,7 +117,7 @@ function CanvasRenderer({ image }: { image: HTMLImageElement }) {
     } else {
       setBgImage(null)
     }
-  }, [backgroundConfig])
+  }, [backgroundConfig, containerWidth, containerHeight])
   
   useEffect(() => {
     const updateViewportSize = () => {
@@ -144,44 +173,34 @@ function CanvasRenderer({ image }: { image: HTMLImageElement }) {
   /* ─────────────────── layout helpers ─────────────────── */
   const imageAspect = image.naturalWidth / image.naturalHeight
   
-  // Use responsive dimensions for container
-  const containerWidth = responsiveDimensions.width
-  const containerHeight = responsiveDimensions.height
-  
-  // Calculate canvas aspect ratio from selected aspect ratio
-  const canvasAspect =
-    canvas.aspectRatio === 'square'
-      ? 1
-      : canvas.aspectRatio === '4:3'
-      ? 4 / 3
-      : canvas.aspectRatio === '2:1'
-      ? 2
-      : canvas.aspectRatio === '3:2'
-      ? 3 / 2
-      : imageAspect // fallback: free
+  // Calculate canvas aspect ratio from selected aspect ratio using responsive dimensions
+  const canvasAspect = containerWidth / containerHeight
 
   // Calculate content area (image area without padding)
-  // Use viewport-aware dimensions
+  // Use viewport-aware dimensions, respecting the selected aspect ratio
   const availableWidth = Math.min(viewportSize.width * 0.8, containerWidth)
   const availableHeight = Math.min(viewportSize.height * 0.7, containerHeight)
   
-  let contentW, contentH
-  if (imageAspect > canvasAspect) {
-    contentW = Math.min(availableWidth - canvas.padding * 2, image.naturalWidth)
-    contentH = contentW / canvasAspect
+  // Calculate canvas dimensions that maintain the selected aspect ratio
+  let canvasW, canvasH
+  if (availableWidth / availableHeight > canvasAspect) {
+    // Height is the limiting factor
+    canvasH = availableHeight - canvas.padding * 2
+    canvasW = canvasH * canvasAspect
   } else {
-    contentH = Math.min(availableHeight - canvas.padding * 2, image.naturalHeight)
-    contentW = contentH * canvasAspect
+    // Width is the limiting factor
+    canvasW = availableWidth - canvas.padding * 2
+    canvasH = canvasW / canvasAspect
   }
 
   // Ensure reasonable dimensions
   const minContentSize = 300
-  contentW = Math.max(contentW, minContentSize)
-  contentH = Math.max(contentH, minContentSize)
+  canvasW = Math.max(canvasW, minContentSize)
+  canvasH = Math.max(canvasH, minContentSize)
 
-  // Canvas dimensions (with padding)
-  const canvasW = contentW + canvas.padding * 2
-  const canvasH = contentH + canvas.padding * 2
+  // Content dimensions (without padding)
+  const contentW = canvasW - canvas.padding * 2
+  const contentH = canvasH - canvas.padding * 2
 
   useEffect(() => {
     if (patternRectRef.current) {
@@ -218,150 +237,6 @@ function CanvasRenderer({ image }: { image: HTMLImageElement }) {
   const framedW = imageScaledW + frameOffset * 2 + windowPadding * 2 + eclipseBorder
   const framedH = imageScaledH + frameOffset * 2 + windowPadding * 2 + windowHeader + eclipseBorder
 
-  /* ─────────────────── background + shadow helpers ─────────────────── */
-  // Use backgroundConfig from useImageStore for gradients and solid colors
-  const getKonvaBackgroundProps = () => {
-    if (backgroundConfig.type === 'gradient') {
-      // Parse gradient string to get colors and direction
-      const gradientStr = backgroundStyle.background as string
-      
-      // Check if gradientStr is valid
-      if (!gradientStr || typeof gradientStr !== 'string') {
-        // Fallback to default gradient
-        const rad = (45 * Math.PI) / 180
-        const cx = canvasW / 2
-        const cy = canvasH / 2
-        const hw = canvasW / 2
-        const hh = canvasH / 2
-        return {
-          fillLinearGradientStartPoint: {
-            x: cx - Math.cos(rad) * hw,
-            y: cy - Math.sin(rad) * hh,
-          },
-          fillLinearGradientEndPoint: {
-            x: cx + Math.cos(rad) * hw,
-            y: cy + Math.sin(rad) * hh,
-          },
-          fillLinearGradientColorStops: [0, '#4168d0', 1, '#c850c0'],
-        }
-      }
-      
-      // Check if it's a radial gradient
-      if (gradientStr.includes('radial-gradient')) {
-        // For radial gradients, extract colors and use a radial-like linear gradient
-        const rgbMatches = gradientStr.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/g)
-        let colorA = '#4168d0'
-        let colorB = '#c850c0'
-        
-        if (rgbMatches && rgbMatches.length >= 2) {
-          colorA = rgbMatches[0]
-          colorB = rgbMatches[rgbMatches.length - 1]
-        } else {
-          const hexMatches = gradientStr.match(/#[0-9A-Fa-f]{6}/g)
-          if (hexMatches && hexMatches.length >= 2) {
-            colorA = hexMatches[0]
-            colorB = hexMatches[hexMatches.length - 1]
-          }
-        }
-        
-        // Use a 45-degree angle for radial gradients approximated as linear
-        const rad = (45 * Math.PI) / 180
-        const cx = canvasW / 2
-        const cy = canvasH / 2
-        const hw = canvasW / 2
-        const hh = canvasH / 2
-        
-        return {
-          fillLinearGradientStartPoint: {
-            x: cx - Math.cos(rad) * hw,
-            y: cy - Math.sin(rad) * hh,
-          },
-          fillLinearGradientEndPoint: {
-            x: cx + Math.cos(rad) * hw,
-            y: cy + Math.sin(rad) * hh,
-          },
-          fillLinearGradientColorStops: [0, colorA, 1, colorB],
-        }
-      }
-      
-      // Parse linear gradient
-      const angleMatch = gradientStr.match(/linear-gradient\((\d+)deg/)
-      const angle = angleMatch ? parseInt(angleMatch[1], 10) : 45
-      
-      // Extract colors from gradient string
-      const rgbMatches = gradientStr.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/g)
-      let colorA = '#4168d0'
-      let colorB = '#c850c0'
-      
-      if (rgbMatches && rgbMatches.length >= 2) {
-        colorA = rgbMatches[0]
-        colorB = rgbMatches[rgbMatches.length - 1]
-      } else {
-        const hexMatches = gradientStr.match(/#[0-9A-Fa-f]{6}/g)
-        if (hexMatches && hexMatches.length >= 2) {
-          colorA = hexMatches[0]
-          colorB = hexMatches[hexMatches.length - 1]
-        }
-      }
-      
-      const rad = (angle * Math.PI) / 180
-      const cx = canvasW / 2
-      const cy = canvasH / 2
-      const hw = canvasW / 2
-      const hh = canvasH / 2
-
-      return {
-        fillLinearGradientStartPoint: {
-          x: cx - Math.cos(rad) * hw,
-          y: cy - Math.sin(rad) * hh,
-        },
-        fillLinearGradientEndPoint: {
-          x: cx + Math.cos(rad) * hw,
-          y: cy + Math.sin(rad) * hh,
-        },
-        fillLinearGradientColorStops: [0, colorA, 1, colorB],
-      }
-    } else if (backgroundConfig.type === 'solid') {
-      return {
-        fill: backgroundStyle.backgroundColor || '#ffffff',
-      }
-    } else if (backgroundConfig.type === 'image' && bgImage) {
-      return {
-        fillPatternImage: bgImage,
-        fillPatternRepeat: 'no-repeat',
-        fillPatternScaleX: canvasW / bgImage.width,
-        fillPatternScaleY: canvasH / bgImage.height,
-      }
-    }
-    
-    // Fallback to editorStore background
-    if (background.mode === 'gradient') {
-      const rad = (background.gradientDirection * Math.PI) / 180
-      const cx = canvasW / 2
-      const cy = canvasH / 2
-      const hw = canvasW / 2
-      const hh = canvasH / 2
-
-      return {
-        fillLinearGradientStartPoint: {
-          x: cx - Math.cos(rad) * hw,
-          y: cy - Math.sin(rad) * hh,
-        },
-        fillLinearGradientEndPoint: {
-          x: cx + Math.cos(rad) * hw,
-          y: cy + Math.sin(rad) * hh,
-        },
-        fillLinearGradientColorStops: [0, background.colorA, 1, background.colorB],
-      }
-    }
-    
-    return {
-      fill: background.mode === 'solid' ? background.colorA : '#ffffff',
-    }
-  }
-
-  const backgroundProps = getKonvaBackgroundProps()
-
   const shadowProps = shadow.enabled
     ? (() => {
         const { elevation, side, softness, color, intensity } = shadow
@@ -387,54 +262,73 @@ function CanvasRenderer({ image }: { image: HTMLImageElement }) {
 
   /* ─────────────────── render ─────────────────── */
   return (
-    <div className="w-full h-full flex items-center justify-center">
-      <div className="w-full flex items-center justify-center">
+    <div
+      ref={containerRef}
+      id="image-render-card"
+      className="flex items-center justify-center relative overflow-hidden"
+      style={{
+        width: '100%',
+        maxWidth: `${containerWidth}px`,
+        aspectRatio: responsiveDimensions.aspectRatio,
+        maxHeight: '90vh',
+        backgroundColor: 'transparent',
+        padding: '24px',
+      }}
+    >
+      <div
+        style={{
+          position: 'relative',
+          width: `${canvasW}px`,
+          height: `${canvasH}px`,
+          minWidth: `${canvasW}px`,
+          minHeight: `${canvasH}px`,
+          overflow: 'hidden',
+        }}
+      >
+        {/* Background layer - DOM element for html2canvas compatibility */}
         <div
-          ref={containerRef}
-          id="image-render-card"
-          className="overflow-hidden shadow-2xl flex items-center justify-center relative"
+          id="canvas-background"
           style={{
-            ...backgroundStyle,
-            width: '100%',
-            maxWidth: `${containerWidth}px`,
-            aspectRatio: responsiveDimensions.aspectRatio,
-            maxHeight: '90vh',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: `${canvasW}px`,
+            height: `${canvasH}px`,
+            zIndex: 0,
             borderRadius: `${backgroundBorderRadius}px`,
+            ...backgroundStyle,
+          }}
+        />
+        
+        {/* Text overlays */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            pointerEvents: 'none',
+            zIndex: 20,
+            overflow: 'hidden',
           }}
         >
-        <div className="w-full h-full flex items-center justify-center relative z-10 p-6">
-          <div
-            style={{
-              position: 'relative',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: `${canvasW}px`,
-              height: `${canvasH}px`,
-              minWidth: `${canvasW}px`,
-              minHeight: `${canvasH}px`,
-            }}
-          >
-            <div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                pointerEvents: 'none',
-                zIndex: 20,
-              }}
-            >
-              <TextOverlayRenderer />
-            </div>
-            <Stage
-              width={canvasW}
-              height={canvasH}
-              ref={stageRef}
-              className="hires-stage"
-              style={{
-                display: 'block',
-                backgroundColor: 'transparent',
-              }}
-            >
+          <TextOverlayRenderer />
+        </div>
+        
+        {/* Konva Stage - only for user images, frames, patterns, noise */}
+        <Stage
+          width={canvasW}
+          height={canvasH}
+          ref={stageRef}
+          className="hires-stage"
+          style={{
+            display: 'block',
+            backgroundColor: 'transparent',
+            overflow: 'hidden',
+            position: 'relative',
+            zIndex: 10,
+          }}
+        >
+          {/* Remove background layer - now handled by DOM element above */}
+
           <Layer>
             {patternImage && (
               <Rect
@@ -763,12 +657,14 @@ function CanvasRenderer({ image }: { image: HTMLImageElement }) {
             </Group>
           </Layer>
         </Stage>
-          </div>
-        </div>
       </div>
     </div>
-    </div>
   )
+}
+
+// Export function to get the Konva stage
+export function getKonvaStage(): any {
+  return globalKonvaStage;
 }
 
 export default function ClientCanvas() {
