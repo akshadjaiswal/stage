@@ -1,0 +1,36 @@
+# Stage - Image Showcase Builder
+
+## About
+Stage is a modern web-based canvas editor for creating stunning visual designs. Upload images, add text overlays, customize backgrounds, and export high-quality graphics—all in your browser.
+
+## Core Features
+- Image Upload & Customization - Upload images and adjust size, opacity, borders, shadows, and border radius
+- Text Overlays - Add multiple text overlays with custom fonts, colors, sizes, positions, and text shadows
+- Backgrounds - Choose from gradients, solid colors, or upload your own background images
+- Presets - Apply 5 ready-made presets (Social Ready, Story Style, Minimal Clean, Bold Gradient, Dark Elegant) for instant professional styling
+- Aspect Ratios - Support for Instagram, social media, and standard photo formats
+- Export - Export as PNG (with transparency) or JPG with adjustable quality and scale (up to 5x)
+
+## Pages
+- Home: https://stage-psi-one.vercel.app/ - Landing page with features and pricing
+- Editor: https://stage-psi-one.vercel.app/home - Canvas editor for creating designs
+
+## Technology Stack
+- Next.js 16 with App Router
+- React 19
+- TypeScript
+- Konva/React-Konva for canvas rendering
+- Cloudinary for image optimization
+- Tailwind CSS for styling
+- Zustand for state management
+
+## Use Cases
+- Creating social media graphics
+- Designing showcase images for projects
+- Adding text overlays to images
+- Creating custom backgrounds
+- Exporting high-resolution images for print or web
+
+## Target Audience
+Designers, content creators, developers, and anyone who needs to create professional visual designs quickly and easily.
+
