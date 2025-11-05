@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { HeroVideoDialog } from "@/components/ui/hero-video-dialog";
 import { Instrument_Serif } from "next/font/google";
 
 const instrumentSerif = Instrument_Serif({
@@ -24,6 +26,10 @@ export function Hero({
   ctaLabel = "Get Started",
   ctaHref = "/home",
 }: HeroProps) {
+  const [isVideoOpen, setIsVideoOpen] = useState(false);
+  const videoEmbedUrl = "https://www.youtube.com/embed/zDux_K4SsH0";
+  const videoThumbnailUrl = "https://img.youtube.com/vi/zDux_K4SsH0/maxresdefault.jpg";
+
   return (
     <main className="flex-1 flex items-center justify-center px-4 sm:px-6 py-12 sm:py-16 md:py-20 bg-background">
       <div className="container mx-auto max-w-4xl text-center space-y-6 sm:space-y-8">
@@ -49,13 +55,25 @@ export function Hero({
               {ctaLabel}
             </Button>
           </Link>
-          <Link href="" className="w-full sm:w-auto">
-            <Button size="lg" variant="outline" className="rounded-lg w-full sm:w-auto border-primary text-primary hover:bg-accent hover:border-primary/80 touch-manipulation min-h-[44px] text-base sm:text-lg">
-              View Demo
-            </Button>
-          </Link>
+          <Button 
+            size="lg" 
+            variant="outline" 
+            className="rounded-lg w-full sm:w-auto border-primary text-primary hover:bg-accent hover:border-primary/80 touch-manipulation min-h-[44px] text-base sm:text-lg"
+            onClick={() => setIsVideoOpen(true)}
+          >
+            View Demo
+          </Button>
         </div>
       </div>
+      <HeroVideoDialog
+        videoSrc={videoEmbedUrl}
+        thumbnailSrc={videoThumbnailUrl}
+        thumbnailAlt="Demo video thumbnail"
+        open={isVideoOpen}
+        onOpenChange={setIsVideoOpen}
+        showThumbnail={false}
+        animationStyle="from-center"
+      />
     </main>
   );
 }
