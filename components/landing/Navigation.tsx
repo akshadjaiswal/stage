@@ -74,7 +74,7 @@ export function Navigation({
           />
         </Link>
         <div className="flex items-center gap-2 sm:gap-3">
-          <a
+          <Link
             href="https://github.com/KartikLabhshetwar/stage"
             target="_blank"
             rel="noopener noreferrer"
@@ -88,8 +88,8 @@ export function Navigation({
                 <AnimatedCounter value={stars} />
               </span>
             )}
-          </a>
-          <a
+          </Link>
+          <Link
             href="https://x.com/code_kartik"
             target="_blank"
             rel="noopener noreferrer"
@@ -97,7 +97,7 @@ export function Navigation({
             aria-label="X (Twitter) profile"
           >
             <SiX className="h-5 w-5 text-current" />
-          </a>
+          </Link>
           <Link href={ctaHref}>
             <Button className="bg-primary text-primary-foreground hover:bg-primary/90 text-sm px-3 sm:px-4 py-2 touch-manipulation">
               {ctaLabel}
