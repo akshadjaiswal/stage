@@ -346,6 +346,7 @@ function CanvasRenderer({ image }: { image: HTMLImageElement }) {
         {/* Noise overlay */}
         {noiseTexture && backgroundNoise > 0 && (
           <div
+            id="canvas-noise-overlay"
             style={{
               position: 'absolute',
               top: 0,
