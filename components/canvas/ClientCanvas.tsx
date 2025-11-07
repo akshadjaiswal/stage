@@ -324,7 +324,7 @@ function CanvasRenderer({ image }: { image: HTMLImageElement }) {
           height: `${canvasH}px`,
           minWidth: `${canvasW}px`,
           minHeight: `${canvasH}px`,
-          overflow: 'hidden',
+          overflow: 'visible', // Allow overlays to extend beyond canvas bounds
           borderRadius: `${backgroundBorderRadius}px`,
         }}
       >
@@ -365,28 +365,29 @@ function CanvasRenderer({ image }: { image: HTMLImageElement }) {
           />
         )}
         
-        {/* Text overlays */}
+        {/* Text overlays - positioned above user image */}
         <div
           style={{
             position: 'absolute',
             inset: 0,
             pointerEvents: 'none',
-            zIndex: 20,
-            overflow: 'hidden',
+            zIndex: 30, // Higher than Konva Stage to ensure text appears above user image
+            overflow: 'visible', // Allow text to extend beyond canvas bounds
             borderRadius: `${backgroundBorderRadius}px`,
           }}
         >
           <TextOverlayRenderer />
         </div>
 
-        {/* Image overlays */}
+        {/* Image overlays - positioned above user image */}
         <div
           style={{
             position: 'absolute',
             inset: 0,
-            zIndex: 25,
-            overflow: 'hidden',
+            zIndex: 35, // Highest z-index to ensure images appear above everything
+            overflow: 'visible', // Allow overlays to extend beyond canvas bounds
             borderRadius: `${backgroundBorderRadius}px`,
+            pointerEvents: 'none', // Allow clicks to pass through to overlay elements
           }}
         >
           <OverlayRenderer />
@@ -431,6 +432,7 @@ function CanvasRenderer({ image }: { image: HTMLImageElement }) {
         )}
         
         {/* Konva Stage - only for user images, frames, patterns, noise */}
+        {/* Lower z-index so overlays appear above */}
         <Stage
           width={canvasW}
           height={canvasH}
@@ -441,7 +443,7 @@ function CanvasRenderer({ image }: { image: HTMLImageElement }) {
             backgroundColor: 'transparent',
             overflow: 'hidden',
             position: 'relative',
-            zIndex: 10,
+            zIndex: 5, // Lower z-index so text and image overlays appear above user image
           }}
         >
           {/* Remove background layer - now handled by DOM element above */}

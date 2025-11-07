@@ -333,7 +333,282 @@ async function applyNoiseToCanvas(
 }
 
 /**
- * Export background and text overlays using html2canvas
+ * Export overlays (text and image) separately to ensure they appear above user image
+ */
+async function exportOverlays(
+  width: number,
+  height: number,
+  scale: number,
+  textOverlays: any[],
+  imageOverlays: any[] = []
+): Promise<HTMLCanvasElement> {
+  // Create export container for overlays only
+  const container = document.createElement('div');
+  container.style.position = 'fixed';
+  container.style.left = '-99999px';
+  container.style.top = '0';
+  container.style.width = `${width}px`;
+  container.style.height = `${height}px`;
+  container.style.overflow = 'visible';
+  container.style.background = 'transparent';
+  container.style.zIndex = '999999';
+  container.style.visibility = 'visible';
+  container.style.opacity = '1';
+  
+  document.body.appendChild(container);
+  
+  try {
+    const canvasContainer = document.getElementById('image-render-card');
+    if (!canvasContainer) {
+      throw new Error('Canvas container not found. Please ensure the canvas is properly initialized.');
+    }
+
+    // Get the actual canvas container dimensions
+    // The inner div has explicit width/height set in pixels (canvasW, canvasH)
+    const innerCanvasDiv = canvasContainer.querySelector('div[style*="position: relative"]') as HTMLElement;
+    let actualCanvasWidth = 0;
+    let actualCanvasHeight = 0;
+    
+    if (innerCanvasDiv) {
+      // Try inline style first (most reliable)
+      const inlineWidth = innerCanvasDiv.style.width;
+      const inlineHeight = innerCanvasDiv.style.height;
+      if (inlineWidth && inlineWidth.endsWith('px')) {
+        actualCanvasWidth = parseFloat(inlineWidth);
+      }
+      if (inlineHeight && inlineHeight.endsWith('px')) {
+        actualCanvasHeight = parseFloat(inlineHeight);
+      }
+      
+      // Fallback to computed style
+      if (!actualCanvasWidth || !actualCanvasHeight) {
+        const computedStyle = window.getComputedStyle(innerCanvasDiv);
+        actualCanvasWidth = actualCanvasWidth || parseFloat(computedStyle.width) || 0;
+        actualCanvasHeight = actualCanvasHeight || parseFloat(computedStyle.height) || 0;
+      }
+    }
+    
+    // Final fallback to container bounding rect
+    const canvasRect = canvasContainer.getBoundingClientRect();
+    if (!actualCanvasWidth || !actualCanvasHeight) {
+      actualCanvasWidth = canvasRect.width;
+      actualCanvasHeight = canvasRect.height;
+    }
+    
+    // Calculate uniform scale factor to maintain aspect ratio
+    // This ensures overlays maintain their relative positions and sizes
+    let scaleX = 1;
+    let scaleY = 1;
+    if (actualCanvasWidth > 0 && actualCanvasHeight > 0) {
+      // Use uniform scaling - same scale for both X and Y to prevent distortion
+      const scaleX_calc = width / actualCanvasWidth;
+      const scaleY_calc = height / actualCanvasHeight;
+      // Use the smaller scale to ensure everything fits within export dimensions
+      const uniformScale = Math.min(scaleX_calc, scaleY_calc);
+      scaleX = uniformScale;
+      scaleY = uniformScale;
+    }
+
+    // Add text overlays with high z-index
+    for (const overlay of textOverlays) {
+      if (!overlay.isVisible) continue;
+      
+      const textElement = document.createElement('div');
+      textElement.style.position = 'absolute';
+      textElement.style.left = `${(overlay.position.x / 100) * width}px`;
+      textElement.style.top = `${(overlay.position.y / 100) * height}px`;
+      textElement.style.transform = 'translate(-50%, -50%)';
+      textElement.style.fontSize = `${overlay.fontSize * scaleX}px`;
+      textElement.style.fontWeight = overlay.fontWeight;
+      textElement.style.fontFamily = getFontCSS(overlay.fontFamily);
+      
+      let textColor = overlay.color;
+      if (textColor && textColor.includes('oklch')) {
+        const tempEl = document.createElement('div');
+        tempEl.style.color = textColor;
+        document.body.appendChild(tempEl);
+        const computed = window.getComputedStyle(tempEl).color;
+        document.body.removeChild(tempEl);
+        textColor = computed || textColor;
+      }
+      textElement.style.color = textColor;
+      
+      textElement.style.opacity = overlay.opacity.toString();
+      textElement.style.whiteSpace = 'nowrap';
+      textElement.style.pointerEvents = 'none';
+      textElement.style.zIndex = '2000'; // High z-index for text overlays
+      textElement.style.visibility = 'visible';
+      textElement.style.display = 'block';
+      textElement.textContent = overlay.text;
+      
+      if (overlay.orientation === 'vertical') {
+        textElement.style.writingMode = 'vertical-rl';
+      }
+      
+      if (overlay.textShadow?.enabled) {
+        // Convert shadow color if it contains oklch
+        let shadowColor = overlay.textShadow.color;
+        if (shadowColor && shadowColor.includes('oklch')) {
+          const tempEl = document.createElement('div');
+          tempEl.style.color = shadowColor;
+          document.body.appendChild(tempEl);
+          const computed = window.getComputedStyle(tempEl).color;
+          document.body.removeChild(tempEl);
+          shadowColor = computed || shadowColor;
+        }
+        // Scale shadow offsets for export
+        textElement.style.textShadow = `${overlay.textShadow.offsetX * scaleX}px ${overlay.textShadow.offsetY * scaleY}px ${overlay.textShadow.blur * scaleX}px ${shadowColor}`;
+      }
+      
+      container.appendChild(textElement);
+    }
+
+    // Add image overlays with highest z-index
+    for (const overlay of imageOverlays) {
+      if (!overlay.isVisible) continue;
+
+      const overlayElement = document.createElement('div');
+      overlayElement.style.position = 'absolute';
+      overlayElement.style.opacity = overlay.opacity.toString();
+      overlayElement.style.transformOrigin = 'center center';
+      overlayElement.style.pointerEvents = 'none';
+      overlayElement.style.overflow = 'visible'; // Allow overlays to extend beyond bounds
+      overlayElement.style.zIndex = '3000'; // Highest z-index for image overlays
+      overlayElement.style.visibility = 'visible';
+      overlayElement.style.display = 'block';
+
+      const img = document.createElement('img');
+      img.crossOrigin = 'anonymous';
+      img.style.objectFit = 'contain';
+      img.style.display = 'block';
+      
+      let imageSrc = overlay.src;
+      if (typeof overlay.src === 'string' && !overlay.isCustom) {
+        const isCloudinaryId = overlay.src.startsWith('overlays/');
+        
+        if (isCloudinaryId) {
+          const cloudName = typeof window !== 'undefined' 
+            ? (window as any).__NEXT_DATA__?.env?.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ||
+              (process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME as string)
+            : (process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME as string);
+          
+          if (!cloudName) {
+            throw new Error(`Cloudinary cloud name not found. Please ensure NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME is set in your environment variables.`);
+          }
+          
+          // Calculate export size based on uniform scale to maintain aspect ratio
+          // Use overlay.size scaled by the uniform scale factor, with 2x for high-res export
+          const exportSize = Math.max(Math.round(overlay.size * scaleX * 2), 200);
+          
+          try {
+            const { getCldImageUrl } = await import('@/lib/cloudinary');
+            // Request square dimensions from Cloudinary to match the square container
+            // The 'fit' crop will maintain the image's aspect ratio within the square
+            const generatedUrl = getCldImageUrl({
+              src: overlay.src,
+              width: exportSize,
+              height: exportSize,
+              quality: 'auto',
+              format: 'auto',
+              crop: 'fit', // Maintain aspect ratio, fit within square bounds
+            });
+            
+            if (generatedUrl && (generatedUrl.startsWith('http://') || generatedUrl.startsWith('https://'))) {
+              imageSrc = generatedUrl;
+            } else {
+              // Fallback: construct Cloudinary URL manually with 'fit' crop
+              imageSrc = `https://res.cloudinary.com/${cloudName}/image/upload/q_auto,f_auto,c_fit,w_${exportSize},h_${exportSize}/${overlay.src}`;
+            }
+          } catch (error) {
+            console.warn(`getCldImageUrl failed for ${overlay.src}, using manual URL construction:`, error);
+            // Fallback: construct Cloudinary URL manually with 'fit' crop
+            imageSrc = `https://res.cloudinary.com/${cloudName}/image/upload/q_auto,f_auto,c_fit,w_${exportSize},h_${exportSize}/${overlay.src}`;
+          }
+        }
+      }
+      
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error(`Timeout loading overlay image: ${overlay.src} (URL: ${imageSrc})`));
+        }, 30000); // 30 second timeout
+        
+        img.onload = () => {
+          clearTimeout(timeout);
+          overlayElement.style.width = `${overlay.size * scaleX}px`;
+          overlayElement.style.height = `${overlay.size * scaleY}px`;
+          overlayElement.style.left = `${overlay.position.x * scaleX}px`;
+          overlayElement.style.top = `${overlay.position.y * scaleY}px`;
+          
+          overlayElement.style.transform = `
+            rotate(${overlay.rotation}deg)
+            scaleX(${overlay.flipX ? -1 : 1})
+            scaleY(${overlay.flipY ? -1 : 1})
+          `;
+          
+          img.style.width = '100%';
+          img.style.height = '100%';
+          overlayElement.appendChild(img);
+          resolve();
+        };
+        img.onerror = (error) => {
+          clearTimeout(timeout);
+          reject(new Error(`Failed to load overlay image: ${overlay.src} (URL: ${imageSrc}). Error: ${error}`));
+        };
+        img.src = imageSrc;
+      });
+
+      container.appendChild(overlayElement);
+    }
+    
+    // Wait for fonts to load
+    if (document.fonts && document.fonts.ready) {
+      await document.fonts.ready;
+    }
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
+    // Force a reflow
+    void container.offsetHeight;
+    
+    // Capture overlays with html2canvas
+    const overlaysCanvas = await html2canvas(container, {
+      backgroundColor: null,
+      scale: scale,
+      useCORS: true,
+      allowTaint: true,
+      logging: false,
+      width: width,
+      height: height,
+      windowWidth: width,
+      windowHeight: height,
+      removeContainer: false,
+      onclone: (clonedDoc, clonedElement) => {
+        // Inject RGB overrides to prevent oklch colors
+        injectRGBOverrides(clonedDoc);
+        
+        // Convert any remaining oklch colors in the cloned document
+        const clonedElements = clonedElement.querySelectorAll('*');
+        clonedElements.forEach((el) => {
+          if (el instanceof HTMLElement) {
+            convertStylesToRGB(el, clonedDoc);
+          }
+        });
+        convertStylesToRGB(clonedElement as HTMLElement, clonedDoc);
+      },
+    });
+    
+    document.body.removeChild(container);
+    return overlaysCanvas;
+  } catch (error) {
+    // Clean up container on error
+    if (container.parentNode) {
+      document.body.removeChild(container);
+    }
+    throw error;
+  }
+}
+
+/**
+ * Export background only (without overlays) using html2canvas
  */
 async function exportBackground(
   width: number,
@@ -341,8 +616,6 @@ async function exportBackground(
   scale: number,
   backgroundConfig: any,
   borderRadius: number,
-  textOverlays: any[],
-  imageOverlays: any[] = [],
   backgroundBlur: number = 0,
   backgroundNoise: number = 0
 ): Promise<HTMLCanvasElement> {
@@ -399,107 +672,8 @@ async function exportBackground(
       scaleY = height / canvasRect.height;
     }
 
-    // Add text overlays
-    for (const overlay of textOverlays) {
-      if (!overlay.isVisible) continue;
-      
-      const textElement = document.createElement('div');
-      textElement.style.position = 'absolute';
-      // Text overlays use percentage positions (0-100)
-      textElement.style.left = `${(overlay.position.x / 100) * width}px`;
-      textElement.style.top = `${(overlay.position.y / 100) * height}px`;
-      textElement.style.transform = 'translate(-50%, -50%)';
-      // Scale font size for export
-      textElement.style.fontSize = `${overlay.fontSize * scaleX}px`;
-      textElement.style.fontWeight = overlay.fontWeight;
-      textElement.style.fontFamily = getFontCSS(overlay.fontFamily);
-      
-      // Convert oklch color to RGB
-      let textColor = overlay.color;
-      if (textColor && textColor.includes('oklch')) {
-        const tempEl = document.createElement('div');
-        tempEl.style.color = textColor;
-        document.body.appendChild(tempEl);
-        const computed = window.getComputedStyle(tempEl).color;
-        document.body.removeChild(tempEl);
-        textColor = computed || textColor;
-      }
-      textElement.style.color = textColor;
-      
-      textElement.style.opacity = overlay.opacity.toString();
-      textElement.style.whiteSpace = 'nowrap';
-      textElement.style.pointerEvents = 'none';
-      textElement.style.zIndex = '1000';
-      textElement.style.visibility = 'visible';
-      textElement.style.display = 'block';
-      textElement.textContent = overlay.text;
-      
-      if (overlay.orientation === 'vertical') {
-        textElement.style.writingMode = 'vertical-rl';
-      }
-      
-      if (overlay.textShadow?.enabled) {
-        // Convert shadow color if it contains oklch
-        let shadowColor = overlay.textShadow.color;
-        if (shadowColor && shadowColor.includes('oklch')) {
-          const tempEl = document.createElement('div');
-          tempEl.style.color = shadowColor;
-          document.body.appendChild(tempEl);
-          const computed = window.getComputedStyle(tempEl).color;
-          document.body.removeChild(tempEl);
-          shadowColor = computed || shadowColor;
-        }
-        // Scale shadow offsets for export
-        textElement.style.textShadow = `${overlay.textShadow.offsetX * scaleX}px ${overlay.textShadow.offsetY * scaleY}px ${overlay.textShadow.blur * scaleX}px ${shadowColor}`;
-      }
-      
-      container.appendChild(textElement);
-    }
-
-    // Add image overlays
-    for (const overlay of imageOverlays) {
-      if (!overlay.isVisible) continue;
-
-      const overlayElement = document.createElement('div');
-      overlayElement.style.position = 'absolute';
-      // Image overlays use pixel positions relative to preview canvas
-      // Scale them to export dimensions
-      overlayElement.style.left = `${overlay.position.x * scaleX}px`;
-      overlayElement.style.top = `${overlay.position.y * scaleY}px`;
-      overlayElement.style.width = `${overlay.size * scaleX}px`;
-      overlayElement.style.height = `${overlay.size * scaleY}px`;
-      overlayElement.style.opacity = overlay.opacity.toString();
-      overlayElement.style.transform = `
-        rotate(${overlay.rotation}deg)
-        scaleX(${overlay.flipX ? -1 : 1})
-        scaleY(${overlay.flipY ? -1 : 1})
-      `;
-      overlayElement.style.transformOrigin = 'center center';
-      overlayElement.style.pointerEvents = 'none';
-      overlayElement.style.overflow = 'hidden';
-      overlayElement.style.zIndex = '1001';
-      overlayElement.style.visibility = 'visible';
-      overlayElement.style.display = 'block';
-
-      const img = document.createElement('img');
-      img.crossOrigin = 'anonymous';
-      img.style.width = '100%';
-      img.style.height = '100%';
-      img.style.objectFit = 'contain';
-      img.style.display = 'block';
-      
-      // Wait for image to load before appending
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => {
-          overlayElement.appendChild(img);
-          resolve();
-        };
-        img.onerror = () => reject(new Error(`Failed to load overlay image: ${overlay.src}`));
-        img.src = overlay.src;
-      });
-
-      container.appendChild(overlayElement);
-    }
+    // Note: Text and image overlays are now exported separately in exportOverlays()
+    // to ensure they appear above the user image in the final export
     
     // Wait for background image to load if it's an image background
     if (backgroundConfig.type === 'image' && backgroundConfig.value) {
@@ -835,11 +1009,13 @@ async function exportKonvaStage(
 
 
 /**
- * Composite background and Konva stage into final canvas
+ * Composite background, Konva stage, and overlays into final canvas
+ * Layer order: background -> user image (Konva) -> text overlays -> image overlays
  */
 function compositeCanvases(
   backgroundCanvas: HTMLCanvasElement,
   konvaCanvas: HTMLCanvasElement,
+  overlaysCanvas: HTMLCanvasElement | null,
   width: number,
   height: number,
   scale: number
@@ -857,11 +1033,16 @@ function compositeCanvases(
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
   
-  // Draw background first
+  // Layer 1: Draw background first (lowest layer)
   ctx.drawImage(backgroundCanvas, 0, 0, width * scale, height * scale);
   
-  // Draw Konva canvas on top
+  // Layer 2: Draw Konva canvas (user image) on top of background
   ctx.drawImage(konvaCanvas, 0, 0, width * scale, height * scale);
+  
+  // Layer 3: Draw overlays on top of user image (highest layer)
+  if (overlaysCanvas) {
+    ctx.drawImage(overlaysCanvas, 0, 0, width * scale, height * scale);
+  }
   
   return finalCanvas;
 }
@@ -896,15 +1077,13 @@ export async function exportElement(
   }
 
   try {
-    // Step 1: Export background and text overlays using html2canvas
+    // Step 1: Export background only (without overlays)
     const backgroundCanvas = await exportBackground(
       options.exportWidth,
       options.exportHeight,
       options.scale,
       backgroundConfig,
       backgroundBorderRadius,
-      textOverlays,
-      imageOverlays,
       backgroundBlur,
       backgroundNoise
     );
@@ -918,6 +1097,17 @@ export async function exportElement(
       options.format,
       options.quality
     );
+    
+    // Step 2.5: Export overlays separately to ensure they appear above user image
+    const overlaysCanvas = (textOverlays.length > 0 || imageOverlays.length > 0)
+      ? await exportOverlays(
+          options.exportWidth,
+          options.exportHeight,
+          options.scale,
+          textOverlays,
+          imageOverlays
+        )
+      : null;
 
     // Step 2.5: If 3D transforms are active, capture using modern-screenshot
     if (perspective3D && imageSrc) {
@@ -983,10 +1173,11 @@ export async function exportElement(
       }
     }
 
-    // Step 3: Composite both canvases
+    // Step 3: Composite all layers in correct order: background -> user image -> overlays
     const finalCanvas = compositeCanvases(
       backgroundCanvas,
       konvaCanvas,
+      overlaysCanvas,
       options.exportWidth,
       options.exportHeight,
       options.scale

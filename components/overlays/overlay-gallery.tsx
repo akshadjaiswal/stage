@@ -6,7 +6,7 @@ import { OVERLAY_IMAGES } from '@/lib/constants/overlays'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Search, Upload } from 'lucide-react'
-import Image from 'next/image'
+import { CldImage } from 'next-cloudinary'
 import { useResponsiveCanvasDimensions } from '@/hooks/useAspectRatioDimensions'
 
 export function OverlayGallery() {
@@ -15,8 +15,8 @@ export function OverlayGallery() {
   const [customOverlayRef, setCustomOverlayRef] = useState<HTMLInputElement | null>(null)
   const responsiveDimensions = useResponsiveCanvasDimensions()
 
-  const filteredOverlays = OVERLAY_IMAGES.filter((src) =>
-    src.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredOverlays = OVERLAY_IMAGES.filter((publicId) =>
+    publicId.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   // Calculate default position at the top center of canvas
@@ -106,20 +106,23 @@ export function OverlayGallery() {
       </div>
 
       <div className="grid grid-cols-4 gap-2 max-h-64 overflow-y-auto pr-2">
-        {filteredOverlays.map((src, index) => (
+        {filteredOverlays.map((publicId, index) => (
           <button
             key={index}
-            onClick={() => handleAddOverlay(src)}
+            onClick={() => handleAddOverlay(publicId)}
             className="aspect-square bg-muted rounded-lg border border-border hover:border-primary transition-colors overflow-hidden p-1.5 flex items-center justify-center group"
-            title={src.split('/').pop()?.replace(/\.(png|webp|jpg|jpeg)$/i, '')}
+            title={publicId.split('/').pop()}
           >
             <div className="relative w-full h-full">
-              <Image
-                src={src}
+              <CldImage
+                src={publicId}
                 alt={`Overlay ${index + 1}`}
-                fill
-                className="object-contain group-hover:scale-105 transition-transform"
-                sizes="(max-width: 768px) 25vw, 10vw"
+                width={100}
+                height={100}
+                quality="auto"
+                format="auto"
+                crop="fit"
+                className="object-contain w-full h-full group-hover:scale-105 transition-transform"
               />
             </div>
           </button>
