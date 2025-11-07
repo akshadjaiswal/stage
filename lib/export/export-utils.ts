@@ -289,3 +289,62 @@ export async function waitForImages(element: HTMLElement): Promise<void> {
   }
 }
 
+/**
+ * Generate Gaussian (normal) distributed random number using Box-Muller transform
+ * This creates more natural-looking noise compared to uniform random
+ */
+function gaussianRandom(mean: number = 0, stdDev: number = 1): number {
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random(); // Converting [0,1) to (0,1)
+  while (v === 0) v = Math.random();
+  const z = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+  return z * stdDev + mean;
+}
+
+/**
+ * Generate a noise texture canvas with Gaussian-distributed noise
+ * This creates realistic image grain/noise similar to film grain or sensor noise
+ * 
+ * @param width - Canvas width in pixels
+ * @param height - Canvas height in pixels
+ * @param intensity - Noise intensity (0-1), controls the standard deviation
+ * @returns Canvas element with noise texture
+ */
+export function generateNoiseTexture(
+  width: number,
+  height: number,
+  intensity: number
+): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  
+  if (!ctx) return canvas;
+  
+  const imageData = ctx.createImageData(width, height);
+  const data = imageData.data;
+  
+  // Intensity controls the standard deviation of the Gaussian distribution
+  // Higher intensity = more variation in pixel values
+  const stdDev = intensity * 50; // Scale to reasonable range (0-50)
+  
+  // Generate Gaussian noise for each pixel
+  for (let i = 0; i < data.length; i += 4) {
+    // Generate Gaussian noise value centered at 128 (mid-gray)
+    const noise = gaussianRandom(128, stdDev);
+    
+    // Clamp to valid RGB range [0, 255]
+    const value = Math.max(0, Math.min(255, Math.round(noise)));
+    
+    // Apply same value to R, G, B for grayscale noise
+    data[i] = value;     // R
+    data[i + 1] = value; // G
+    data[i + 2] = value; // B
+    data[i + 3] = 255;   // A (fully opaque)
+  }
+  
+  ctx.putImageData(imageData, 0, 0);
+  return canvas;
+}
+

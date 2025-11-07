@@ -10,10 +10,7 @@ import { domToCanvas } from 'modern-screenshot';
 import {
   convertStylesToRGB,
   injectRGBOverrides,
-  preserveImageStyles,
-  convertSVGStyles,
-  setupExportElement,
-  waitForImages,  
+  generateNoiseTexture,
 } from './export-utils';
 import { addWatermarkToCanvas } from './watermark';
 import { getBackgroundCSS } from '@/lib/constants/backgrounds';
@@ -88,7 +85,8 @@ function createBackgroundElement(
   width: number,
   height: number,
   backgroundConfig: any,
-  borderRadius: number
+  borderRadius: number,
+  backgroundBlur: number = 0
 ): HTMLElement {
   const bgElement = document.createElement('div');
   bgElement.id = 'export-background-temp';
@@ -101,6 +99,11 @@ function createBackgroundElement(
   bgElement.style.padding = '0';
   bgElement.style.borderRadius = `${borderRadius}px`;
   bgElement.style.overflow = 'hidden';
+  
+  // Apply blur effect if specified
+  if (backgroundBlur > 0) {
+    bgElement.style.filter = `blur(${backgroundBlur}px)`;
+  }
   
   // Apply background styles
   const backgroundStyle = getBackgroundCSS(backgroundConfig);
@@ -150,6 +153,105 @@ function createBackgroundElement(
 }
 
 /**
+ * Apply blur effect to a canvas using Canvas 2D context filter
+ * This is more reliable than relying on html2canvas to capture CSS filters
+ * 
+ * @param canvas - The canvas to apply blur to
+ * @param blurAmount - Blur amount in pixels (should be scaled for high-DPI exports)
+ * @returns A new canvas with the blur effect applied
+ */
+function applyBlurToCanvas(
+  canvas: HTMLCanvasElement,
+  blurAmount: number
+): HTMLCanvasElement {
+  if (blurAmount <= 0) {
+    return canvas;
+  }
+
+  const blurredCanvas = document.createElement('canvas');
+  blurredCanvas.width = canvas.width;
+  blurredCanvas.height = canvas.height;
+  const ctx = blurredCanvas.getContext('2d');
+  
+  if (!ctx) {
+    return canvas;
+  }
+
+  // Apply blur filter using Canvas 2D context
+  // This is the most reliable way to ensure blur is captured in exports
+  ctx.filter = `blur(${blurAmount}px)`;
+  ctx.drawImage(canvas, 0, 0);
+  ctx.filter = 'none';
+
+  return blurredCanvas;
+}
+
+/**
+ * Apply noise overlay to a canvas
+ * The noise is composited on top of the existing canvas content
+ * Matches preview exactly: same texture size, opacity, and blend mode
+ * 
+ * @param canvas - The canvas to apply noise to
+ * @param noiseIntensity - Noise intensity (0-1), converted from percentage
+ * @param width - Canvas width in pixels
+ * @param height - Canvas height in pixels
+ * @param scale - Export scale factor
+ * @returns A new canvas with the noise overlay applied
+ */
+function applyNoiseToCanvas(
+  canvas: HTMLCanvasElement,
+  noiseIntensity: number,
+  width: number,
+  height: number,
+  scale: number
+): HTMLCanvasElement {
+  if (noiseIntensity <= 0) {
+    return canvas;
+  }
+
+  // Use the actual canvas dimensions (html2canvas may have scaled it)
+  const canvasWidth = canvas.width;
+  const canvasHeight = canvas.height;
+
+  const finalCanvas = document.createElement('canvas');
+  finalCanvas.width = canvasWidth;
+  finalCanvas.height = canvasHeight;
+  const ctx = finalCanvas.getContext('2d');
+  
+  if (!ctx) {
+    return canvas;
+  }
+
+  // Draw the existing canvas first (this includes the blurred background)
+  ctx.drawImage(canvas, 0, 0);
+
+  // Generate noise texture - use EXACT same parameters as preview for visual parity
+  // Preview uses: generateNoiseTexture(200, 200, intensity) where intensity = backgroundNoise / 100
+  // We use the same intensity value to ensure the noise pattern matches exactly
+  const noiseCanvas = generateNoiseTexture(200, 200, noiseIntensity);
+  
+  // Apply noise with overlay blend mode (matching preview's mix-blend-mode: overlay)
+  // Use the exact same opacity calculation as preview: backgroundNoise / 100
+  ctx.save();
+  ctx.globalCompositeOperation = 'overlay';
+  ctx.globalAlpha = noiseIntensity; // This matches preview's opacity: backgroundNoise / 100
+  
+  // Tile the noise texture across the canvas
+  // Use imageSmoothingEnabled: false to preserve noise grain sharpness
+  ctx.imageSmoothingEnabled = false;
+  const pattern = ctx.createPattern(noiseCanvas, 'repeat');
+  if (pattern) {
+    ctx.fillStyle = pattern;
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+  }
+  ctx.imageSmoothingEnabled = true; // Restore for future operations
+  
+  ctx.restore();
+
+  return finalCanvas;
+}
+
+/**
  * Export background and text overlays using html2canvas
  */
 async function exportBackground(
@@ -158,7 +260,9 @@ async function exportBackground(
   scale: number,
   backgroundConfig: any,
   borderRadius: number,
-  textOverlays: any[]
+  textOverlays: any[],
+  backgroundBlur: number = 0,
+  backgroundNoise: number = 0
 ): Promise<HTMLCanvasElement> {
   // Try to use the existing canvas-background element from the DOM
   const existingBgElement = document.getElementById('canvas-background');
@@ -185,7 +289,15 @@ async function exportBackground(
     bgElement.style.top = '0';
     bgElement.style.left = '0';
     bgElement.id = 'export-background-temp';
+    
+    // Remove blur from CSS - we'll apply it via canvas after capture
+    // This ensures we can blur background without blurring noise
+    bgElement.style.setProperty('filter', 'none', 'important');
+    
     container.appendChild(bgElement);
+    
+    // Don't add noise overlay to DOM - we'll apply it via canvas after blur
+    // This ensures noise is sharp on top of blurred background, matching preview exactly
     
     // Add text overlays
     textOverlays.forEach((overlay) => {
@@ -289,6 +401,7 @@ async function exportBackground(
       await new Promise(resolve => setTimeout(resolve, 50));
       
       // Capture background and text overlays with html2canvas
+      // Exclude noise overlay - we'll apply it via canvas after blur
       const canvas = await html2canvas(container, {
         backgroundColor: null,
         scale: scale,
@@ -300,6 +413,10 @@ async function exportBackground(
         windowWidth: width,
         windowHeight: height,
         removeContainer: false,
+        ignoreElements: (element) => {
+          // Ignore noise overlay if it exists - we'll apply it via canvas
+          return element.id === 'export-noise-overlay';
+        },
         onclone: (clonedDoc, clonedElement) => {
           // Disable stylesheets that contain oklch
           try {
@@ -319,6 +436,18 @@ async function exportBackground(
           
           // Inject RGB overrides to prevent oklch colors
           injectRGBOverrides(clonedDoc);
+          
+          // Preserve filter styles (blur, etc.) in cloned document
+          const clonedBgElement = clonedElement.querySelector('#export-background-temp') as HTMLElement;
+          if (clonedBgElement) {
+            // Ensure filter is preserved in cloned document
+            if (backgroundBlur > 0) {
+              clonedBgElement.style.setProperty('filter', `blur(${backgroundBlur}px)`, 'important');
+            } else {
+              // Clear filter if blur is 0
+              clonedBgElement.style.setProperty('filter', 'none', 'important');
+            }
+          }
           
           // Convert any remaining oklch colors in the cloned document
           const clonedElements = clonedElement.querySelectorAll('*');
@@ -340,7 +469,20 @@ async function exportBackground(
       });
       
       document.body.removeChild(container);
-      return canvas;
+      
+      // Step 1: Apply blur to background (noise was excluded from capture)
+      const blurredCanvas = backgroundBlur > 0 
+        ? applyBlurToCanvas(canvas, backgroundBlur * scale)
+        : canvas;
+      
+      // Step 2: Apply noise overlay on top of blurred background
+      // This matches the preview exactly: sharp noise on top of blurred background
+      if (backgroundNoise > 0) {
+        const noiseIntensity = backgroundNoise / 100;
+        return applyNoiseToCanvas(blurredCanvas, noiseIntensity, width, height, scale);
+      }
+      
+      return blurredCanvas;
     } catch (error) {
       document.body.removeChild(container);
       throw error;
@@ -361,7 +503,7 @@ async function exportBackground(
   document.body.appendChild(container);
   
   // Create background element
-  const bgElement = createBackgroundElement(width, height, backgroundConfig, borderRadius);
+  const bgElement = createBackgroundElement(width, height, backgroundConfig, borderRadius, backgroundBlur);
   container.appendChild(bgElement);
   
   // Add text overlays if any
@@ -483,23 +625,22 @@ async function exportBackground(
     // Wait a moment for styles to apply
     await new Promise(resolve => setTimeout(resolve, 50));
     
-    // Capture background and text overlays with html2canvas
-    // Use ignoreElements to exclude any elements that might have oklch
-    const canvas = await html2canvas(container, {
-      backgroundColor: null,
-      scale: scale,
-      useCORS: true,
-      allowTaint: true,
-      logging: false,
-      width: width,
-      height: height,
-      windowWidth: width,
-      windowHeight: height,
-      removeContainer: false,
-      ignoreElements: (element) => {
-        // Don't ignore our elements, but this helps html2canvas skip problematic ones
-        return false;
-      },
+      // Capture background and text overlays with html2canvas
+      const canvas = await html2canvas(container, {
+        backgroundColor: null,
+        scale: scale,
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        width: width,
+        height: height,
+        windowWidth: width,
+        windowHeight: height,
+        removeContainer: false,
+        ignoreElements: (element) => {
+          // Ignore noise overlay if it exists - we'll apply it via canvas
+          return element.id === 'export-noise-overlay';
+        },
       onclone: (clonedDoc, clonedElement) => {
         // Disable stylesheets that contain oklch
         try {
@@ -520,6 +661,18 @@ async function exportBackground(
         // Inject RGB overrides to prevent oklch colors
         injectRGBOverrides(clonedDoc);
         
+        // Preserve filter styles (blur, etc.) in cloned document
+        const clonedBgElement = clonedElement.querySelector('#export-background-temp') as HTMLElement;
+        if (clonedBgElement) {
+          // Ensure filter is preserved in cloned document
+          if (backgroundBlur > 0) {
+            clonedBgElement.style.setProperty('filter', `blur(${backgroundBlur}px)`, 'important');
+          } else {
+            // Clear filter if blur is 0
+            clonedBgElement.style.setProperty('filter', 'none', 'important');
+          }
+        }
+        
         // Convert any remaining oklch colors in the cloned document
         const clonedElements = clonedElement.querySelectorAll('*');
         clonedElements.forEach((el) => {
@@ -539,7 +692,19 @@ async function exportBackground(
     },
   });
 
-    return canvas;
+    // Step 1: Apply blur to background
+    const blurredCanvas = backgroundBlur > 0 
+      ? applyBlurToCanvas(canvas, backgroundBlur * scale)
+      : canvas;
+
+    // Step 2: Apply noise overlay on top of blurred background
+    // This matches the preview exactly: sharp noise on top of blurred background
+    if (backgroundNoise > 0) {
+      const noiseIntensity = backgroundNoise / 100;
+      return applyNoiseToCanvas(blurredCanvas, noiseIntensity, width, height, scale);
+    }
+
+    return blurredCanvas;
   } finally {
     // Clean up
     document.body.removeChild(container);
@@ -730,6 +895,7 @@ async function exportKonvaStage(
   }
 }
 
+
 /**
  * Composite background and Konva stage into final canvas
  */
@@ -748,6 +914,10 @@ function compositeCanvases(
   if (!ctx) {
     throw new Error('Failed to get canvas context');
   }
+  
+  // Use high-quality image smoothing
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
   
   // Draw background first
   ctx.drawImage(backgroundCanvas, 0, 0, width * scale, height * scale);
@@ -770,7 +940,9 @@ export async function exportElement(
   textOverlays: any[] = [],
   perspective3D?: any,
   imageSrc?: string,
-  screenshotRadius?: number
+  screenshotRadius?: number,
+  backgroundBlur: number = 0,
+  backgroundNoise: number = 0
 ): Promise<ExportResult> {
   // Wait a bit to ensure DOM is ready
   await new Promise(resolve => setTimeout(resolve, 200));
@@ -792,7 +964,9 @@ export async function exportElement(
       options.scale,
       backgroundConfig,
       backgroundBorderRadius,
-      textOverlays
+      textOverlays,
+      backgroundBlur,
+      backgroundNoise
     );
 
     // Step 2: Export Konva stage (user images, frames, patterns, etc.) - excluding backgrounds
@@ -887,17 +1061,17 @@ export async function exportElement(
     });
 
     // Step 5: Convert to blob and data URL
-  const mimeType = options.format === 'jpg' ? 'image/jpeg' : 'image/png';
+    const mimeType = options.format === 'jpg' ? 'image/jpeg' : 'image/png';
   
-  const blob = await new Promise<Blob>((resolve, reject) => {
+    const blob = await new Promise<Blob>((resolve, reject) => {
       finalCanvas.toBlob((blob) => {
-      if (!blob) {
-        reject(new Error('Failed to create blob from canvas'));
-        return;
-      }
-      resolve(blob);
-    }, mimeType, options.quality);
-  });
+        if (!blob) {
+          reject(new Error('Failed to create blob from canvas'));
+          return;
+        }
+        resolve(blob);
+      }, mimeType, options.quality);
+    });
   
     const dataURL = finalCanvas.toDataURL(mimeType, options.quality);
   

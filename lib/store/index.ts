@@ -396,6 +396,8 @@ interface ImageState {
   backgroundBorderRadius: number
   selectedAspectRatio: AspectRatioKey
   backgroundConfig: BackgroundConfig
+  backgroundBlur: number
+  backgroundNoise: number
   textOverlays: TextOverlay[]
   imageOpacity: number
   imageScale: number
@@ -420,6 +422,8 @@ interface ImageState {
   setBackgroundType: (type: BackgroundType) => void
   setBackgroundValue: (value: string) => void
   setBackgroundOpacity: (opacity: number) => void
+  setBackgroundBlur: (blur: number) => void
+  setBackgroundNoise: (noise: number) => void
   addTextOverlay: (overlay: Omit<TextOverlay, 'id'>) => void
   updateTextOverlay: (id: string, updates: Partial<TextOverlay>) => void
   removeTextOverlay: (id: string) => void
@@ -444,6 +448,8 @@ export const useImageStore = create<ImageState>((set, get) => ({
     value: 'backgrounds/backgrounds/mac/mac-asset-10',
     opacity: 1,
   },
+  backgroundBlur: 0,
+  backgroundNoise: 0,
   textOverlays: [],
   imageOpacity: 1,
   imageScale: 100,
@@ -586,6 +592,14 @@ export const useImageStore = create<ImageState>((set, get) => ({
         opacity,
       },
     })
+  },
+
+  setBackgroundBlur: (blur: number) => {
+    set({ backgroundBlur: blur })
+  },
+
+  setBackgroundNoise: (noise: number) => {
+    set({ backgroundNoise: noise })
   },
 
   addTextOverlay: (overlay) => {

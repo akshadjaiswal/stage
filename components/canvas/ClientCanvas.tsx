@@ -8,6 +8,7 @@ import { generatePattern } from '@/lib/patterns'
 import { useResponsiveCanvasDimensions } from '@/hooks/useAspectRatioDimensions'
 import { getBackgroundCSS } from '@/lib/constants/backgrounds'
 import { TextOverlayRenderer } from '@/components/image-render/text-overlay-renderer'
+import { generateNoiseTexture } from '@/lib/export/export-utils'
 
 // Global ref to store the Konva stage for export
 let globalKonvaStage: any = null;
@@ -49,7 +50,7 @@ function CanvasRenderer({ image }: { image: HTMLImageElement }) {
     noise,
   } = useEditorStore()
 
-  const { backgroundConfig, backgroundBorderRadius, perspective3D, imageOpacity } = useImageStore()
+  const { backgroundConfig, backgroundBorderRadius, backgroundBlur, backgroundNoise, perspective3D, imageOpacity } = useImageStore()
   const responsiveDimensions = useResponsiveCanvasDimensions()
   const backgroundStyle = getBackgroundCSS(backgroundConfig)
   
@@ -58,6 +59,20 @@ function CanvasRenderer({ image }: { image: HTMLImageElement }) {
   
   // Load background image if type is 'image'
   const [bgImage, setBgImage] = useState<HTMLImageElement | null>(null)
+  
+  // Generate noise texture for background noise effect
+  const [noiseTexture, setNoiseTexture] = useState<string | null>(null)
+  
+  useEffect(() => {
+    if (backgroundNoise > 0) {
+      // Generate noise texture using Gaussian distribution for realistic grain
+      const intensity = backgroundNoise / 100 // Convert percentage to 0-1 range
+      const noiseCanvas = generateNoiseTexture(200, 200, intensity)
+      setNoiseTexture(noiseCanvas.toDataURL())
+    } else {
+      setNoiseTexture(null)
+    }
+  }, [backgroundNoise])
   
   // Get container dimensions early for use in useEffect
   const containerWidth = responsiveDimensions.width
@@ -323,9 +338,30 @@ function CanvasRenderer({ image }: { image: HTMLImageElement }) {
             height: `${canvasH}px`,
             zIndex: 0,
             borderRadius: `${backgroundBorderRadius}px`,
+            filter: backgroundBlur > 0 ? `blur(${backgroundBlur}px)` : 'none',
             ...backgroundStyle,
           }}
         />
+        
+        {/* Noise overlay */}
+        {noiseTexture && backgroundNoise > 0 && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: `${canvasW}px`,
+              height: `${canvasH}px`,
+              zIndex: 1,
+              borderRadius: `${backgroundBorderRadius}px`,
+              backgroundImage: `url(${noiseTexture})`,
+              backgroundRepeat: 'repeat',
+              opacity: backgroundNoise / 100,
+              pointerEvents: 'none',
+              mixBlendMode: 'overlay',
+            }}
+          />
+        )}
         
         {/* Text overlays */}
         <div

@@ -15,6 +15,7 @@ import { solidColors, type SolidColorKey } from '@/lib/constants/solid-colors';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { FaImage, FaTimes } from 'react-icons/fa';
+import { BackgroundEffects } from '@/components/controls/BackgroundEffects';
 
 export function EditorRightPanel() {
   const { 
@@ -434,6 +435,9 @@ export function EditorRightPanel() {
                   className="w-full"
                 />
               </div>
+
+              {/* Background Effects */}
+              <BackgroundEffects />
             </div>
           </div>
         </>
