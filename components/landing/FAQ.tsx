@@ -54,7 +54,7 @@ const defaultFAQs: FAQItem[] = [
   },
   {
     question: "What image file formats can I upload?",
-    answer: "You can upload PNG, JPG, JPEG, or WEBP images. Each image can be up to 10MB in size. The editor handles all processing in your browser for fast, secure editing.",
+    answer: "You can upload PNG, JPG, JPEG, or WEBP images. Each image can be up to 100MB in size. The editor handles all processing in your browser for fast, secure editing.",
   },
   {
     question: "Can I save my designs to my computer?",
