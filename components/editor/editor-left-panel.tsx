@@ -7,7 +7,8 @@ import { TextOverlayControls } from '@/components/text-overlay/text-overlay-cont
 import { OverlayGallery, OverlayControls } from '@/components/overlays';
 import { StyleTabs } from './style-tabs';
 import { Button } from '@/components/ui/button';
-import { Download, Trash2, Copy } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Download, Trash2, Copy, ImageIcon, Type, Sticker } from 'lucide-react';
 import { useImageStore } from '@/lib/store';
 import { ExportDialog } from '@/components/canvas/dialogs/ExportDialog';
 import { useExport } from '@/hooks/useExport';
@@ -23,6 +24,7 @@ export function EditorLeftPanel() {
   
   const [exportDialogOpen, setExportDialogOpen] = React.useState(false);
   const [copySuccess, setCopySuccess] = React.useState(false);
+  const [activeTab, setActiveTab] = React.useState('image');
 
   const {
     settings: exportSettings,
@@ -34,9 +36,9 @@ export function EditorLeftPanel() {
 
   return (
     <>
-      <div className="w-full h-full bg-muted flex flex-col overflow-hidden md:w-80 border-r border-border">
+      <div className="w-full h-full bg-background flex flex-col overflow-hidden md:w-80 border-r border-border">
         {/* Header */}
-        <div className="p-4 border-b border-border bg-background">
+        <div className="p-4 border-b border-border">
           <div className="flex items-center gap-3">
             <Link href="/" className="flex items-center hover:opacity-80 transition-opacity shrink-0">
               <Image 
@@ -62,22 +64,53 @@ export function EditorLeftPanel() {
           </div>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-4 space-y-6">
-            {/* Overlay Gallery */}
-            <OverlayGallery />
-            
-            {/* Image Overlays Section */}
-            <OverlayControls />
-            
-            {/* Text Overlays Section */}
-            <TextOverlayControls />
-            
-            {/* Style Controls */}
-            <StyleTabs />
+        {/* Tabs Navigation */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
+          <TabsList className="w-full grid grid-cols-3 rounded-none border-b border-border bg-muted/50 h-12">
+            <TabsTrigger 
+              value="image" 
+              className="data-[state=active]:bg-background data-[state=active]:shadow-none rounded-none border-b-2 border-transparent data-[state=active]:border-primary"
+            >
+              <ImageIcon className="size-4 mr-2" />
+              Image
+            </TabsTrigger>
+            <TabsTrigger 
+              value="text"
+              className="data-[state=active]:bg-background data-[state=active]:shadow-none rounded-none border-b-2 border-transparent data-[state=active]:border-primary"
+            >
+              <Type className="size-4 mr-2" />
+              Text
+            </TabsTrigger>
+            <TabsTrigger 
+              value="stickers"
+              className="data-[state=active]:bg-background data-[state=active]:shadow-none rounded-none border-b-2 border-transparent data-[state=active]:border-primary"
+            >
+              <Sticker className="size-4 mr-2" />
+              Stickers
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Tab Content */}
+          <div className="flex-1 overflow-y-auto">
+            <TabsContent value="image" className="m-0 p-4 space-y-6">
+              {/* Style Controls */}
+              <StyleTabs />
+            </TabsContent>
+
+            <TabsContent value="text" className="m-0 p-4 space-y-6">
+              {/* Text Overlays Section */}
+              <TextOverlayControls />
+            </TabsContent>
+
+            <TabsContent value="stickers" className="m-0 p-4 space-y-6">
+              {/* Overlay Gallery */}
+              <OverlayGallery />
+              
+              {/* Image Overlays Section */}
+              <OverlayControls />
+            </TabsContent>
           </div>
-        </div>
+        </Tabs>
 
         {/* Footer Actions */}
         <div className="p-4 border-t border-border bg-background space-y-2">

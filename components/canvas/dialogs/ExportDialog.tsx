@@ -62,7 +62,7 @@ export function ExportDialog({
             className="w-full h-11 font-semibold bg-primary hover:bg-primary/90 text-primary-foreground"
             size="lg"
           >
-            {isExporting ? "Exporting..." : "Export as PNG"}
+            {isExporting ? "Exporting..." : "Export as JPG"}
           </Button>
         </div>
       </DialogContent>

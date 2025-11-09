@@ -14,7 +14,7 @@ const features = [
   {
     title: "Professional Export",
     description:
-      "Export as PNG (with transparency) with adjustable quality and scale up to 5x. All processing happens in your browser—no external services required. Perfect for social media and high-resolution output.",
+      "Export as JPG (with transparency) with adjustable quality and scale up to 5x. All processing happens in your browser—no external services required. Perfect for social media and high-resolution output.",
   },
 ];
 

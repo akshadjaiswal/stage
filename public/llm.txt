@@ -9,7 +9,7 @@ Stage is a modern web-based canvas editor for creating stunning visual designs. 
 - Backgrounds - Choose from gradients, solid colors, or upload your own background images
 - Presets - Apply 5 ready-made presets (Social Ready, Story Style, Minimal Clean, Bold Gradient, Dark Elegant) for instant professional styling
 - Aspect Ratios - Support for Instagram, social media, and standard photo formats
-- Export - Export as PNG (with transparency) or JPG with adjustable quality and scale (up to 5x)
+- Export - Export as JPG (with transparency)
 
 ## Pages
 - Home: https://stage-psi-one.vercel.app/ - Landing page with features and pricing
